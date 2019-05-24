@@ -1,15 +1,15 @@
 <template>
   <div>
-    <div class="vl_map_ring" v-for="item in callList" :key="item.id">
+    <div :class="'vl_map_ring move_box' + index" v-for="(item, index) in callList" :key="item.id">
       <div class="top">
-        <img src="../assets/logo.png" alt="">
+        <img src="" alt="">
         <div style="color: #ffffff;">
           <h4 style="font-size: 20px;">李德兵</h4>
           <p style="font-size: 12px;">{{curStatus}}...</p>
         </div>
       </div>
       <video id="remoteVideo" autoplay="autoplay"></video>
-      <video style="width: 0; height: 0;" class="vl_map_sing" src="../assets/8521.mp3" autoplay></video>
+      <!--<video style="width: 0; height: 0;" class="vl_map_sing" src="../../assets/8521.mp3" autoplay></video>-->
       <div class="control" style="z-index: 99;position: absolute;bottom: 10px;left: 10px;">
         <el-button type="primary">切换</el-button>
         <el-button type="primary">取消</el-button>
@@ -22,7 +22,7 @@
 <script>
   import {socketio} from '@/utils/util.js'
   export default {
-    props: ['addCall', 'myNo'],
+    props: ['curCall', 'myNo'],
     data () {
       return {
         callList: [],
@@ -38,17 +38,16 @@
         rooms: []
       }
     },
-    watch: {
-      addCall () {
-        console.log('2')
-        this.addConnect(this.addCall)
-      }
-    },
     created () {
       this.init(); // 初始化连接websocket ,监听各个状态
     },
     mounted () {
-      // this.sendInvite();
+    },
+    watch: {
+      curCall () {
+        console.log('addCall---->', this.curCall.remoteId)
+        this.addConnect(this.curCall)
+      }
     },
     methods: {
       addConnect (obj) {
@@ -70,7 +69,7 @@
         this.ws.emit('firstConnect', this.myNo)
         this.ws.on('joinUs', (data) => {
           // 创建offer,发送给房间的远程端
-          let _pc = this.rooms.find(x => x.room === data.room)
+          let _pc = this.rooms.find(x => x.room === data.room).pc
           _pc.createOffer().then(offer => {
             // 把本地offer发送给远程端
             this.ws.emit('sendOffer', {room: data.room, offer: offer})
@@ -84,11 +83,11 @@
         // 收到ICE onCandidate
         this.ws.on('onCandidate', (data) => {
           console.log(data)
-          let _pc = this.rooms.find(x => x.room === data.room)
+          let _pc = this.rooms.find(x => x.room === data.room).pc
           _pc.addIceCandidate(new RTCIceCandidate(data.candidate));
         })
         this.ws.on('onAnswer', (data) => {
-          let _pc = this.rooms.find(x => x.room === data.room)
+          let _pc = this.rooms.find(x => x.room === data.room).pc
           _pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
           console.log(_pc)
         })
@@ -106,7 +105,7 @@
         this.ws.emit('sendInvite', {room: room, targetId: obj.remoteId})
         this.initPeer(room);
       },
-      createMedia () {
+      createMedia (room) {
         if (navigator.mediaDevices === undefined) {
           navigator.mediaDevices = {};
         }
@@ -124,7 +123,9 @@
         navigator.mediaDevices.getUserMedia({video: true, audio: true}).then(stream => {
           this.localStream = stream;
           // 添加到轨道
-          stream.getTracks().forEach(track => this.pc.addTrack(track, stream));
+          let _pc = this.rooms.find(x => x.room === room).pc
+          console.log(_pc)
+          stream.getTracks().forEach(track => _pc.addTrack(track, stream));
         })
       },
       initPeer (room) {
@@ -139,7 +140,7 @@
           pc: pc
         }
         this.rooms.push(_r)
-        this.createMedia();
+        this.createMedia(room);
         // 检测到远程流
         pc.ontrack = event => {
           console.log(event)
@@ -183,8 +184,7 @@
           }
         }
       }
-    },
-    watch: {}
+    }
   }
 </script>
 
@@ -213,6 +213,6 @@
     height: 46px;
   }
   .vl_map_ring .top div h4 {
-    
+
   }
 </style>
